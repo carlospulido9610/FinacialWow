@@ -46,18 +46,19 @@ export default function ExpensesView({ expenses, addExpense, deleteExpense, edit
     e.preventDefault();
     if (!formData.amount || isNaN(formData.amount)) return;
     
+    const localDate = new Date(formData.date + 'T12:00:00').toISOString();
     if (editingId) {
       editExpense(editingId, {
         amount: Number(formData.amount),
         description: formData.description,
-        date: new Date(formData.date).toISOString()
+        date: localDate
       });
       setEditingId(null);
     } else {
       addExpense({ 
         amount: Number(formData.amount), 
         description: formData.description || 'Gasto General', 
-        date: new Date(formData.date).toISOString() 
+        date: localDate 
       });
     }
     
@@ -66,10 +67,14 @@ export default function ExpensesView({ expenses, addExpense, deleteExpense, edit
 
   const startEdit = (e) => {
     setEditingId(e.id);
+    const localDate = new Date(e.date);
+    const yyyy = localDate.getFullYear();
+    const mm = String(localDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(localDate.getDate()).padStart(2, '0');
     setFormData({
       amount: String(e.amount),
       description: e.description || '',
-      date: e.date.split('T')[0]
+      date: `${yyyy}-${mm}-${dd}`
     });
   };
 

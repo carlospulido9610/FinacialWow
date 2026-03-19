@@ -46,11 +46,11 @@ export function usePayments() {
 
   // ─── PAYMENTS ───
   const addPayment = useCallback(async (data) => {
-    const dateObj = data.date ? new Date(data.date) : new Date();
+    // data.date is already a full ISO string from the view (created with T12:00:00)
     const row = {
       amount: Number(data.amount),
       owner: data.owner,
-      date: dateObj.toISOString(),
+      date: data.date || new Date().toISOString(),
       created_at: new Date().toISOString(),
     };
     const { data: inserted, error } = await supabase.from('payments').insert(row).select().single();
@@ -132,11 +132,11 @@ export function usePayments() {
 
   // ─── EXPENSES ───
   const addExpense = useCallback(async (data) => {
-    const dateObj = data.date ? new Date(data.date) : new Date();
+    // data.date is already a full ISO string from the view (created with T12:00:00)
     const row = {
       amount: Number(data.amount),
       description: data.description || 'Gasto General',
-      date: dateObj.toISOString(),
+      date: data.date || new Date().toISOString(),
       created_at: new Date().toISOString(),
     };
     const { data: inserted, error } = await supabase.from('expenses').insert(row).select().single();

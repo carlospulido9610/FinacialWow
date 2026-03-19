@@ -59,25 +59,31 @@ export default function PaymentsView({ payments, addPayment, deletePayment, edit
     e.preventDefault();
     if (!formData.amount || isNaN(formData.amount)) return;
     
+    const localDate = new Date(formData.date + 'T12:00:00').toISOString();
     if (editingId) {
       editPayment(editingId, { 
         amount: Number(formData.amount), 
         owner: formData.owner, 
-        date: new Date(formData.date).toISOString() 
+        date: localDate 
       });
       setEditingId(null);
     } else {
-      addPayment({ amount: Number(formData.amount), owner: formData.owner, date: new Date(formData.date).toISOString() });
+      addPayment({ amount: Number(formData.amount), owner: formData.owner, date: localDate });
     }
     setFormData({ amount: '', owner: 'Me', date: new Date().toISOString().split('T')[0] });
   };
 
   const startEdit = (p) => {
     setEditingId(p.id);
+    // Extract local date from stored ISO to avoid timezone shift
+    const localDate = new Date(p.date);
+    const yyyy = localDate.getFullYear();
+    const mm = String(localDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(localDate.getDate()).padStart(2, '0');
     setFormData({
       amount: String(p.amount),
       owner: p.owner,
-      date: p.date.split('T')[0]
+      date: `${yyyy}-${mm}-${dd}`
     });
   };
 
