@@ -32,7 +32,12 @@ export default function ExpensesView({ expenses, addExpense, deleteExpense, edit
       if (preset === 'month') return isSameMonth(d, now);
       if (preset === 'year') return isSameYear(d, now);
       return true;
-    }).sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
+    }).sort((a, b) => {
+      const db = new Date(b.date || b.createdAt).getTime();
+      const da = new Date(a.date || a.createdAt).getTime();
+      if (db !== da) return db - da;
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    });
   }, [expenses, preset]);
 
   const sumTotal = useMemo(() => filtered.reduce((acc, e) => acc + e.amount, 0), [filtered]);

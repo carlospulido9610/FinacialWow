@@ -12,7 +12,12 @@ export default function WithdrawalCalculator({ stats = {}, withdrawals = [], add
   const [editingId, setEditingId] = useState(null);
 
   const sortedWithdrawals = React.useMemo(() => {
-    return [...withdrawals].sort((a, b) => new Date(b.initiatedAt) - new Date(a.initiatedAt));
+    return [...withdrawals].sort((a, b) => {
+      const db = new Date(b.initiatedAt).getTime();
+      const da = new Date(a.initiatedAt).getTime();
+      if (db !== da) return db - da;
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    });
   }, [withdrawals]);
 
   const numAmount = Number(amount) || 0;

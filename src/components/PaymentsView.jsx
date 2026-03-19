@@ -36,7 +36,13 @@ export default function PaymentsView({ payments, addPayment, deletePayment, edit
       if (preset === 'month') return isSameMonth(d, now);
       if (preset === 'year') return isSameYear(d, now);
       return true;
-    }).sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
+    }).sort((a, b) => {
+      const db = new Date(b.date || b.createdAt).getTime();
+      const da = new Date(a.date || a.createdAt).getTime();
+      if (db !== da) return db - da; // Descending by date
+      // Tie breaker: created_at (newest first)
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    });
   }, [payments, preset, ownerFilter]);
 
   const { sumTotal, sumMe, sumBro } = useMemo(() => {
