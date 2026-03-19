@@ -10,7 +10,7 @@ import {
 import {
   format, subDays, isSameDay, startOfMonth, endOfMonth,
   startOfWeek, endOfWeek, addDays, isSameMonth, isToday,
-  isBefore, startOfDay, addMonths, subMonths,
+  isBefore, startOfDay, endOfDay, addMonths, subMonths,
   isWithinInterval, parseISO, eachDayOfInterval
 } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -29,17 +29,19 @@ const PRESETS = [
 ];
 
 function getRangeForPreset(preset, customFrom, customTo) {
-  const today = startOfDay(new Date());
+  const today = new Date();
+  const todayStart = startOfDay(today);
+  const todayEnd = endOfDay(today);
   switch (preset) {
-    case '7d':  return { from: subDays(today, 6), to: today };
-    case '30d': return { from: subDays(today, 29), to: today };
-    case 'month': return { from: startOfMonth(today), to: endOfMonth(today) };
+    case '7d':  return { from: subDays(todayStart, 6), to: todayEnd };
+    case '30d': return { from: subDays(todayStart, 29), to: todayEnd };
+    case 'month': return { from: startOfMonth(todayStart), to: endOfMonth(todayStart) };
     case 'custom':
       return {
-        from: customFrom ? startOfDay(new Date(customFrom)) : subDays(today, 29),
-        to:   customTo   ? startOfDay(new Date(customTo))   : today,
+        from: customFrom ? startOfDay(new Date(customFrom + 'T12:00:00')) : subDays(todayStart, 29),
+        to:   customTo   ? endOfDay(new Date(customTo + 'T12:00:00'))     : todayEnd,
       };
-    default: return { from: subDays(today, 29), to: today };
+    default: return { from: subDays(todayStart, 29), to: todayEnd };
   }
 }
 
