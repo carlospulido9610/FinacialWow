@@ -78,7 +78,7 @@ export function usePayments() {
 
   // ─── WITHDRAWALS ───
   const addWithdrawal = useCallback(async (data) => {
-    const initiatedAt = new Date();
+    const initiatedAt = data.initiatedAt ? new Date(data.initiatedAt) : new Date();
     const gross = Number(data.amount);
     const net = +(gross * 0.9).toFixed(2);
     const row = {
@@ -112,6 +112,11 @@ export function usePayments() {
       updates.net_amount = +(Number(data.amount) * 0.9).toFixed(2);
     }
     if (data.owner !== undefined) updates.owner = data.owner;
+    if (data.initiatedAt !== undefined) {
+      const dt = new Date(data.initiatedAt);
+      updates.initiated_at = dt.toISOString();
+      updates.arrival_date = addBusinessDays(dt, 5).toISOString();
+    }
 
     const { data: updated, error } = await supabase.from('withdrawals').update(updates).eq('id', id).select().single();
     if (!error && updated) {

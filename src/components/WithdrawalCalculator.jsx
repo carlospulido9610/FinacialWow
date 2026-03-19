@@ -8,6 +8,7 @@ const fmt = (n) =>
 
 export default function WithdrawalCalculator({ stats = {}, withdrawals = [], addWithdrawal, deleteWithdrawal, editWithdrawal }) {
   const [amount, setAmount] = useState('');
+  const [withdrawalDate, setWithdrawalDate] = useState(new Date().toISOString().split('T')[0]);
   const [showConfirm, setShowConfirm] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
@@ -35,25 +36,34 @@ export default function WithdrawalCalculator({ stats = {}, withdrawals = [], add
 
   const handleWithdraw = () => {
     if (!numAmount || numAmount <= 0) return;
+    const localDate = new Date(withdrawalDate + 'T12:00:00').toISOString();
     if (editingId) {
-      editWithdrawal(editingId, { amount: numAmount });
+      editWithdrawal(editingId, { amount: numAmount, initiatedAt: localDate });
       setEditingId(null);
     } else {
-      addWithdrawal({ amount: numAmount });
+      addWithdrawal({ amount: numAmount, initiatedAt: localDate });
     }
     setAmount('');
+    setWithdrawalDate(new Date().toISOString().split('T')[0]);
     setShowConfirm(false);
   };
 
   const startEdit = (w) => {
     setEditingId(w.id);
     setAmount(String(w.amount));
+    // Extract local date from stored ISO
+    const localDate = new Date(w.initiatedAt);
+    const yyyy = localDate.getFullYear();
+    const mm = String(localDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(localDate.getDate()).padStart(2, '0');
+    setWithdrawalDate(`${yyyy}-${mm}-${dd}`);
     setShowConfirm(false);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setAmount('');
+    setWithdrawalDate(new Date().toISOString().split('T')[0]);
     setShowConfirm(false);
   };
 
@@ -122,6 +132,17 @@ export default function WithdrawalCalculator({ stats = {}, withdrawals = [], add
                 MAX
               </button>
             </div>
+          </div>
+
+          {/* Date picker */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.625rem' }}>Fecha del Retiro</label>
+            <input
+              type="date"
+              className="input-control"
+              value={withdrawalDate}
+              onChange={(e) => setWithdrawalDate(e.target.value)}
+            />
           </div>
 
 
