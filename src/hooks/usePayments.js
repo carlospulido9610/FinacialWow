@@ -20,9 +20,9 @@ export function usePayments() {
     async function fetchAll() {
       setLoading(true);
       const [pRes, wRes, eRes] = await Promise.all([
-        supabase.from('payments').select('*').order('created_at', { ascending: false }),
+        supabase.from('payments').select('*').order('date', { ascending: false }),
         supabase.from('withdrawals').select('*').order('initiated_at', { ascending: false }),
-        supabase.from('expenses').select('*').order('created_at', { ascending: false }),
+        supabase.from('expenses').select('*').order('date', { ascending: false }),
       ]);
 
       if (pRes.data) setPayments(pRes.data.map(r => ({

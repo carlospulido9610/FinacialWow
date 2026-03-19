@@ -11,6 +11,10 @@ export default function WithdrawalCalculator({ stats = {}, withdrawals = [], add
   const [showConfirm, setShowConfirm] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
+  const sortedWithdrawals = React.useMemo(() => {
+    return [...withdrawals].sort((a, b) => new Date(b.initiatedAt) - new Date(a.initiatedAt));
+  }, [withdrawals]);
+
   const numAmount = Number(amount) || 0;
   const commission = +(numAmount * 0.1).toFixed(2);
   const net = +(numAmount * 0.9).toFixed(2);
@@ -178,19 +182,19 @@ export default function WithdrawalCalculator({ stats = {}, withdrawals = [], add
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4 }}>Dinero neto en camino a tu cuenta bancaria</p>
           </div>
           <span style={{ background: 'var(--accent-warning-bg)', color: 'var(--accent-warning)', padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 600 }}>
-            {withdrawals.filter(w => !w.arrived).length} pendientes
+            {sortedWithdrawals.filter(w => !w.arrived).length} pendientes
           </span>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', maxHeight: 480 }}>
-          {withdrawals.length === 0 ? (
+          {sortedWithdrawals.length === 0 ? (
             <div style={{ padding: '3rem 0', textAlign: 'center', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
               <Calculator size={42} opacity={0.25} />
               <p style={{ fontSize: '0.875rem' }}>No hay retiros registrados</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-              {withdrawals.map(w => {
+              {sortedWithdrawals.map(w => {
                 const wNet = w.netAmount ?? +(w.amount * 0.9).toFixed(2);
                 return (
                   <div key={w.id} style={{ background: 'var(--bg-secondary)', border: `1px solid ${w.arrived ? 'rgba(34,211,165,0.2)' : 'var(--border-color)'}`, borderRadius: '0.875rem', padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'border-color 150ms' }}>
