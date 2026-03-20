@@ -10,7 +10,7 @@ import { usePayments } from './hooks/usePayments';
 function App() {
   const [currentPath, setCurrentPath] = React.useState('dashboard');
   const [showMigrate, setShowMigrate] = React.useState(true);
-  const { payments, withdrawals, expenses, stats, loading, addPayment, deletePayment, editPayment, addWithdrawal, deleteWithdrawal, editWithdrawal, addExpense, deleteExpense, editExpense } = usePayments();
+  const { payments, withdrawals, expenses, stats, loading, addPayment, deletePayment, editPayment, addWithdrawal, deleteWithdrawal, editWithdrawal, addExpense, deleteExpense, editExpense, simulateSplit } = usePayments();
   const [refreshKey, setRefreshKey] = React.useState(0);
 
   const handleMigrationComplete = () => {
@@ -43,10 +43,13 @@ function App() {
         return (
           <WithdrawalCalculator
             stats={stats}
+            payments={payments}
+            expenses={expenses}
             withdrawals={withdrawals}
             addWithdrawal={addWithdrawal}
             deleteWithdrawal={deleteWithdrawal}
             editWithdrawal={editWithdrawal}
+            simulateSplit={simulateSplit}
           />
         );
       case 'expenses':

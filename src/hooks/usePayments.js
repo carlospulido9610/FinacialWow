@@ -179,10 +179,32 @@ export function usePayments() {
 
     // ── Ledger: Per-person balance tracking ──
     const events = [
-      ...payments.map(p => ({ type: 'payment', date: new Date(p.created_at || p.createdAt || p.date).getTime(), amount: p.amount, owner: p.owner })),
-      ...withdrawals.map(w => ({ type: 'withdrawal', date: new Date(w.initiated_at || w.initiatedAt).getTime(), amount: w.amount, id: w.id })),
-      ...expenses.map(e => ({ type: 'expense', date: new Date(e.created_at || e.createdAt || e.date).getTime(), amount: e.amount }))
-    ].sort((a, b) => a.date - b.date);
+      ...payments.map(p => ({
+        type: 'payment',
+        date: new Date(p.date || p.created_at || p.createdAt).getTime(),
+        amount: p.amount,
+        owner: p.owner,
+        createdAt: new Date(p.created_at || p.createdAt || 0).getTime()
+      })),
+      ...withdrawals.map(w => ({
+        type: 'withdrawal',
+        date: new Date(w.initiated_at || w.initiatedAt).getTime(),
+        amount: w.amount,
+        id: w.id,
+        createdAt: new Date(w.created_at || 0).getTime()
+      })),
+      ...expenses.map(e => ({
+        type: 'expense',
+        date: new Date(e.date || e.created_at || e.createdAt).getTime(),
+        amount: e.amount,
+        createdAt: new Date(e.created_at || e.createdAt || 0).getTime()
+      }))
+    ].sort((a, b) => {
+      if (a.date !== b.date) return a.date - b.date;
+      const order = { payment: 1, expense: 2, withdrawal: 3 };
+      if (order[a.type] !== order[b.type]) return order[a.type] - order[b.type];
+      return a.createdAt - b.createdAt;
+    });
 
     let balMe = 0;
     let balBro = 0;
@@ -198,6 +220,24 @@ export function usePayments() {
         if (total > 0) {
           meShare = balMe / total;
           broShare = balBro / total;
+        } else {
+          let gMe = 0, gBro = 0;
+          payments.forEach(p => {
+            if (new Date(p.date || p.created_at || p.createdAt).getTime() <= ev.date) {
+              if (p.owner === 'Me') gMe += p.amount;
+              else if (p.owner === 'Brother') gBro += p.amount;
+            }
+          });
+          if (gMe + gBro === 0) {
+            payments.forEach(p => {
+              if (p.owner === 'Me') gMe += p.amount;
+              else if (p.owner === 'Brother') gBro += p.amount;
+            });
+          }
+          if (gMe + gBro > 0) {
+            meShare = gMe / (gMe + gBro);
+            broShare = gBro / (gMe + gBro);
+          }
         }
 
         const deductMe = ev.amount * meShare;
@@ -232,7 +272,7 @@ export function usePayments() {
     const totalCommissions = enrichedWithdrawals.reduce((s, w) => s + (w.amount - w.netAmount), 0);
     const totalNetEarnings = totalReceived - totalCommissions;
     const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
-    const availableBalance = Math.max(0, totalReceived - totalWithdrawn - totalExpenses);
+    const availableBalance = balMe + balBro;
 
     return {
       totalReceived,
@@ -246,6 +286,96 @@ export function usePayments() {
       totalExpenses,
       enrichedWithdrawals,
     };
+  }, [payments, withdrawals, expenses]);
+
+  const simulateSplit = useCallback((dateString, excludeId = null) => {
+    const targetDate = new Date(dateString).getTime();
+    const events = [
+      ...payments.map(p => ({
+        type: 'payment',
+        date: new Date(p.date || p.created_at || p.createdAt).getTime(),
+        amount: p.amount,
+        owner: p.owner,
+        id: p.id,
+        createdAt: new Date(p.created_at || p.createdAt || 0).getTime()
+      })),
+      ...withdrawals.map(w => ({
+        type: 'withdrawal',
+        date: new Date(w.initiated_at || w.initiatedAt).getTime(),
+        amount: w.amount,
+        id: w.id,
+        createdAt: new Date(w.created_at || 0).getTime()
+      })),
+      ...expenses.map(e => ({
+        type: 'expense',
+        date: new Date(e.date || e.created_at || e.createdAt).getTime(),
+        amount: e.amount,
+        id: e.id,
+        createdAt: new Date(e.created_at || e.createdAt || 0).getTime()
+      }))
+    ].filter(ev => {
+      if (excludeId && ev.type === 'withdrawal' && ev.id === excludeId) return false;
+      return ev.date <= targetDate;
+    }).sort((a, b) => {
+      if (a.date !== b.date) return a.date - b.date;
+      const order = { payment: 1, expense: 2, withdrawal: 3 };
+      if (order[a.type] !== order[b.type]) return order[a.type] - order[b.type];
+      return a.createdAt - b.createdAt;
+    });
+
+    let balMe = 0, balBro = 0;
+    for (const ev of events) {
+      if (ev.type === 'payment') {
+        if (ev.owner === 'Me') balMe += ev.amount;
+        else if (ev.owner === 'Brother') balBro += ev.amount;
+      } else if (ev.type === 'withdrawal' || ev.type === 'expense') {
+        const total = balMe + balBro;
+        let mS = 0.5, bS = 0.5;
+        if (total > 0) {
+          mS = balMe / total;
+          bS = balBro / total;
+        } else {
+          let gMe = 0, gBro = 0;
+          payments.forEach(p => {
+            if (new Date(p.date || p.created_at || p.createdAt).getTime() <= ev.date) {
+              if (p.owner === 'Me') gMe += p.amount;
+              else if (p.owner === 'Brother') gBro += p.amount;
+            }
+          });
+          if (gMe + gBro === 0) {
+            payments.forEach(p => {
+              if (p.owner === 'Me') gMe += p.amount;
+              else if (p.owner === 'Brother') gBro += p.amount;
+            });
+          }
+          if (gMe + gBro > 0) {
+            mS = gMe / (gMe + gBro);
+            bS = gBro / (gMe + gBro);
+          }
+        }
+        balMe = Math.max(0, balMe - ev.amount * mS);
+        balBro = Math.max(0, balBro - ev.amount * bS);
+      }
+    }
+
+    const total = balMe + balBro;
+    if (total > 0) return { meShare: balMe / total, broShare: balBro / total };
+
+    let gMe = 0, gBro = 0;
+    payments.forEach(p => {
+      if (new Date(p.date || p.created_at || p.createdAt).getTime() <= targetDate) {
+        if (p.owner === 'Me') gMe += p.amount;
+        else if (p.owner === 'Brother') gBro += p.amount;
+      }
+    });
+    if (gMe + gBro === 0) {
+      payments.forEach(p => {
+        if (p.owner === 'Me') gMe += p.amount;
+        else if (p.owner === 'Brother') gBro += p.amount;
+      });
+    }
+    if (gMe + gBro > 0) return { meShare: gMe / (gMe + gBro), broShare: gBro / (gMe + gBro) };
+    return { meShare: 0.5, broShare: 0.5 };
   }, [payments, withdrawals, expenses]);
 
   return {
@@ -264,5 +394,6 @@ export function usePayments() {
     addExpense,
     deleteExpense,
     editExpense,
+    simulateSplit,
   };
 }

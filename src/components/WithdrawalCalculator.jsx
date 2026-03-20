@@ -6,7 +6,7 @@ import { es } from 'date-fns/locale';
 const fmt = (n) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n);
 
-export default function WithdrawalCalculator({ stats = {}, withdrawals = [], addWithdrawal, deleteWithdrawal, editWithdrawal }) {
+export default function WithdrawalCalculator({ stats = {}, payments = [], expenses = [], withdrawals = [], addWithdrawal, deleteWithdrawal, editWithdrawal, simulateSplit }) {
   const [amount, setAmount] = useState('');
   const [withdrawalDate, setWithdrawalDate] = useState(new Date().toISOString().split('T')[0]);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -25,12 +25,12 @@ export default function WithdrawalCalculator({ stats = {}, withdrawals = [], add
   const commission = +(numAmount * 0.1).toFixed(2);
   const net = +(numAmount * 0.9).toFixed(2);
 
-  let meShare = 0.5, broShare = 0.5;
-  const totalBal = (stats.availableBalances?.Me ?? 0) + (stats.availableBalances?.Brother ?? 0);
-  if (totalBal > 0) {
-    meShare = stats.availableBalances.Me / totalBal;
-    broShare = stats.availableBalances.Brother / totalBal;
-  }
+  const { meShare, broShare } = React.useMemo(() => {
+    if (!simulateSplit) return { meShare: 0.5, broShare: 0.5 };
+    const localDate = new Date(withdrawalDate + 'T12:00:00').toISOString();
+    return simulateSplit(localDate, editingId);
+  }, [withdrawalDate, editingId, simulateSplit, payments, withdrawals, expenses]);
+
   const meNetArriving = +(numAmount * meShare * 0.9).toFixed(2);
   const broNetArriving = +(numAmount * broShare * 0.9).toFixed(2);
 
