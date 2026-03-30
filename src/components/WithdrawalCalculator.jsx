@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calculator, Percent, ArrowRight, Trash2, Clock, CheckCircle, AlertCircle, Edit2, X } from 'lucide-react';
+import { Calculator, Percent, ArrowRight, Trash2, Clock, CheckCircle, AlertCircle, Edit2, X, User, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -11,6 +11,7 @@ export default function WithdrawalCalculator({ stats = {}, payments = [], expens
   const [withdrawalDate, setWithdrawalDate] = useState(new Date().toISOString().split('T')[0]);
   const [showConfirm, setShowConfirm] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [withdrawalOwner, setWithdrawalOwner] = useState('Both');
 
   const sortedWithdrawals = React.useMemo(() => {
     return [...withdrawals].sort((a, b) => {
@@ -25,41 +26,52 @@ export default function WithdrawalCalculator({ stats = {}, payments = [], expens
   const commission = +(numAmount * 0.1).toFixed(2);
   const net = +(numAmount * 0.9).toFixed(2);
 
-  const { meShare, broShare } = React.useMemo(() => {
-    if (!simulateSplit) return { meShare: 0.5, broShare: 0.5 };
-    const localDate = new Date(withdrawalDate + 'T12:00:00').toISOString();
-    return simulateSplit(localDate, editingId);
-  }, [withdrawalDate, editingId, simulateSplit, payments, withdrawals, expenses]);
+  // MAX amount depends on who is withdrawing
+  const maxAmount = withdrawalOwner === 'Me'
+    ? (stats.availableBalances?.Me ?? 0)
+    : withdrawalOwner === 'Brother'
+    ? (stats.availableBalances?.Brother ?? 0)
+    : (stats.availableBalance ?? 0);
 
-  const meNetArriving = +(numAmount * meShare * 0.9).toFixed(2);
-  const broNetArriving = +(numAmount * broShare * 0.9).toFixed(2);
+  // Compute exact per-person gross amounts (no percentages!)
+  const { meGross, broGross } = React.useMemo(() => {
+    if (!simulateSplit) return { meGross: numAmount / 2, broGross: numAmount / 2 };
+    return simulateSplit(withdrawalOwner, numAmount, editingId);
+  }, [withdrawalOwner, numAmount, editingId, simulateSplit, payments, withdrawals, expenses]);
+
+  const meNetArriving  = +(meGross * 0.9).toFixed(2);
+  const broNetArriving = +(broGross * 0.9).toFixed(2);
 
   const handleWithdraw = () => {
     if (!numAmount || numAmount <= 0) return;
     const localDate = new Date(withdrawalDate + 'T12:00:00').toISOString();
+    const splitData = { meGross, broGross };
     if (editingId) {
       editWithdrawal(editingId, {
         amount: numAmount,
         initiatedAt: localDate,
-        splitShares: { meShare, broShare },
+        owner: withdrawalOwner,
+        splitData,
       });
       setEditingId(null);
     } else {
       addWithdrawal({
         amount: numAmount,
         initiatedAt: localDate,
-        splitShares: { meShare, broShare },
+        owner: withdrawalOwner,
+        splitData,
       });
     }
     setAmount('');
     setWithdrawalDate(new Date().toISOString().split('T')[0]);
+    setWithdrawalOwner('Both');
     setShowConfirm(false);
   };
 
   const startEdit = (w) => {
     setEditingId(w.id);
     setAmount(String(w.amount));
-    // Extract local date from stored ISO
+    setWithdrawalOwner(w.owner || 'Both');
     const localDate = new Date(w.initiatedAt);
     const yyyy = localDate.getFullYear();
     const mm = String(localDate.getMonth() + 1).padStart(2, '0');
@@ -72,6 +84,7 @@ export default function WithdrawalCalculator({ stats = {}, payments = [], expens
     setEditingId(null);
     setAmount('');
     setWithdrawalDate(new Date().toISOString().split('T')[0]);
+    setWithdrawalOwner('Both');
     setShowConfirm(false);
   };
 
@@ -122,6 +135,38 @@ export default function WithdrawalCalculator({ stats = {}, payments = [], expens
         {/* Amount + breakdown */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.75rem' }}>
           <div>
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.625rem' }}>¿De quién es este retiro?</label>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {[
+                { key: 'Me',      label: 'Carlos',  icon: User,  color: 'var(--accent-primary)' },
+                { key: 'Brother',  label: 'Diego',   icon: User,  color: '#a78bfa' },
+                { key: 'Both',     label: 'Ambos',   icon: Users, color: 'var(--accent-success)' },
+              ].map(({ key, label, icon: Icon, color }) => (
+                <button
+                  key={key}
+                  onClick={() => setWithdrawalOwner(key)}
+                  style={{
+                    flex: 1,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    padding: '0.65rem 0.75rem',
+                    borderRadius: '0.75rem',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    border: withdrawalOwner === key ? `2px solid ${color}` : '1px solid var(--border-color)',
+                    background: withdrawalOwner === key ? `${color}18` : 'var(--bg-secondary)',
+                    color: withdrawalOwner === key ? color : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    transition: 'all 150ms',
+                  }}
+                >
+                  <Icon size={15} />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
             <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.625rem' }}>Monto a Retirar (bruto)</label>
             <div style={{ position: 'relative' }}>
               <span style={{ position: 'absolute', left: '1.25rem', top: '50%', transform: 'translateY(-50%)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-secondary)' }}>$</span>
@@ -133,13 +178,18 @@ export default function WithdrawalCalculator({ stats = {}, payments = [], expens
                 placeholder="0.00"
               />
               <button
-                onClick={() => setAmount(String(+(stats.availableBalance ?? 0).toFixed(2)))}
+                onClick={() => setAmount(String(+maxAmount.toFixed(2)))}
                 className="btn btn-primary"
                 style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', padding: '0.4rem 1rem', fontSize: '0.75rem', borderRadius: '0.5rem' }}
               >
                 MAX
               </button>
             </div>
+            {withdrawalOwner !== 'Both' && (
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 6 }}>
+                Máx. disponible de {withdrawalOwner === 'Me' ? 'Carlos' : 'Diego'}: {fmt(maxAmount)}
+              </p>
+            )}
           </div>
 
           {/* Date picker */}
@@ -196,7 +246,9 @@ export default function WithdrawalCalculator({ stats = {}, payments = [], expens
                   Llegarán <strong style={{ color: 'var(--accent-success)' }}>{fmt(net)}</strong> al banco en 5 días hábiles.
                 </span><br />
                 <span style={{ fontWeight: 500, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                  (Carlos: <strong style={{ color: 'var(--accent-primary)' }}>{fmt(meNetArriving)}</strong> · Diego: <strong style={{ color: '#a78bfa' }}>{fmt(broNetArriving)}</strong>)
+                  {withdrawalOwner === 'Me' && (<>Sale de Carlos: <strong style={{ color: 'var(--accent-primary)' }}>{fmt(meNetArriving)}</strong></>)}
+                  {withdrawalOwner === 'Brother' && (<>Sale de Diego: <strong style={{ color: '#a78bfa' }}>{fmt(broNetArriving)}</strong></>)}
+                  {withdrawalOwner === 'Both' && (<>(Carlos: <strong style={{ color: 'var(--accent-primary)' }}>{fmt(meNetArriving)}</strong> · Diego: <strong style={{ color: '#a78bfa' }}>{fmt(broNetArriving)}</strong>)</>)}
                 </span>
               </p>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
