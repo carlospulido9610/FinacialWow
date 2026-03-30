@@ -38,10 +38,18 @@ export default function WithdrawalCalculator({ stats = {}, payments = [], expens
     if (!numAmount || numAmount <= 0) return;
     const localDate = new Date(withdrawalDate + 'T12:00:00').toISOString();
     if (editingId) {
-      editWithdrawal(editingId, { amount: numAmount, initiatedAt: localDate });
+      editWithdrawal(editingId, {
+        amount: numAmount,
+        initiatedAt: localDate,
+        splitShares: { meShare, broShare },
+      });
       setEditingId(null);
     } else {
-      addWithdrawal({ amount: numAmount, initiatedAt: localDate });
+      addWithdrawal({
+        amount: numAmount,
+        initiatedAt: localDate,
+        splitShares: { meShare, broShare },
+      });
     }
     setAmount('');
     setWithdrawalDate(new Date().toISOString().split('T')[0]);
@@ -125,7 +133,7 @@ export default function WithdrawalCalculator({ stats = {}, payments = [], expens
                 placeholder="0.00"
               />
               <button
-                onClick={() => setAmount(String(stats.availableBalance ?? 0))}
+                onClick={() => setAmount(String(+(stats.availableBalance ?? 0).toFixed(2)))}
                 className="btn btn-primary"
                 style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', padding: '0.4rem 1rem', fontSize: '0.75rem', borderRadius: '0.5rem' }}
               >

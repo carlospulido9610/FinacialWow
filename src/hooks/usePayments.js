@@ -34,6 +34,14 @@ export function usePayments() {
         netAmount: Number(r.net_amount),
         initiatedAt: r.initiated_at,
         arrivalDate: r.arrival_date,
+        createdAt: r.created_at,
+        // Persisted split — may be null for old records
+        persistedSplit: (r.split_me_gross != null) ? {
+          meGross:  Number(r.split_me_gross),
+          broGross: Number(r.split_bro_gross),
+          meNet:    Number(r.split_me_net),
+          broNet:   Number(r.split_bro_net),
+        } : null,
       })));
       if (eRes.data) setExpenses(eRes.data.map(r => ({
         ...r, amount: Number(r.amount), createdAt: r.created_at,
@@ -81,12 +89,26 @@ export function usePayments() {
     const initiatedAt = data.initiatedAt ? new Date(data.initiatedAt) : new Date();
     const gross = Number(data.amount);
     const net = +(gross * 0.9).toFixed(2);
+
+    // ── Calculate split at the moment of registration (Option B) ──
+    // Use the current balances passed in from the UI (already computed by simulateSplit)
+    const splitShares = data.splitShares || { meShare: 0.5, broShare: 0.5 };
+    const meGross  = +(gross * splitShares.meShare).toFixed(4);
+    const broGross = +(gross * splitShares.broShare).toFixed(4);
+    const meNet    = +(meGross * 0.9).toFixed(2);
+    const broNet   = +(broGross * 0.9).toFixed(2);
+
     const row = {
       amount: gross,
       net_amount: net,
       owner: data.owner || 'Me',
       initiated_at: initiatedAt.toISOString(),
       arrival_date: addBusinessDays(initiatedAt, 5).toISOString(),
+      created_at: new Date().toISOString(),
+      split_me_gross:  meGross,
+      split_bro_gross: broGross,
+      split_me_net:    meNet,
+      split_bro_net:   broNet,
     };
     const { data: inserted, error } = await supabase.from('withdrawals').insert(row).select().single();
     if (!error && inserted) {
@@ -96,6 +118,13 @@ export function usePayments() {
         netAmount: Number(inserted.net_amount),
         initiatedAt: inserted.initiated_at,
         arrivalDate: inserted.arrival_date,
+        createdAt: inserted.created_at,
+        persistedSplit: {
+          meGross:  Number(inserted.split_me_gross),
+          broGross: Number(inserted.split_bro_gross),
+          meNet:    Number(inserted.split_me_net),
+          broNet:   Number(inserted.split_bro_net),
+        },
       }, ...prev]);
     }
   }, []);
@@ -108,8 +137,18 @@ export function usePayments() {
   const editWithdrawal = useCallback(async (id, data) => {
     const updates = {};
     if (data.amount !== undefined) {
-      updates.amount = Number(data.amount);
-      updates.net_amount = +(Number(data.amount) * 0.9).toFixed(2);
+      const gross = Number(data.amount);
+      updates.amount = gross;
+      updates.net_amount = +(gross * 0.9).toFixed(2);
+
+      // ── Recalculate split when amount changes (Option B) ──
+      if (data.splitShares) {
+        const { meShare, broShare } = data.splitShares;
+        updates.split_me_gross  = +(gross * meShare).toFixed(4);
+        updates.split_bro_gross = +(gross * broShare).toFixed(4);
+        updates.split_me_net    = +(updates.split_me_gross * 0.9).toFixed(2);
+        updates.split_bro_net   = +(updates.split_bro_gross * 0.9).toFixed(2);
+      }
     }
     if (data.owner !== undefined) updates.owner = data.owner;
     if (data.initiatedAt !== undefined) {
@@ -122,12 +161,19 @@ export function usePayments() {
     if (!error && updated) {
       setWithdrawals(prev => prev.map(w => {
         if (w.id === id) {
+          const hasSplit = updated.split_me_gross != null;
           return {
             ...w, ...updated,
             amount: Number(updated.amount),
             netAmount: Number(updated.net_amount),
             initiatedAt: updated.initiated_at,
             arrivalDate: updated.arrival_date,
+            persistedSplit: hasSplit ? {
+              meGross:  Number(updated.split_me_gross),
+              broGross: Number(updated.split_bro_gross),
+              meNet:    Number(updated.split_me_net),
+              broNet:   Number(updated.split_bro_net),
+            } : w.persistedSplit,
           };
         }
         return w;
@@ -263,7 +309,10 @@ export function usePayments() {
       ...w,
       netAmount: w.netAmount ?? +(w.amount * 0.9).toFixed(2),
       arrived: isArrived(w.arrivalDate || w.arrival_date),
-      split: splitMap[w.id] || { meGross: w.amount / 2, broGross: w.amount / 2, meNet: +(w.amount * 0.45).toFixed(2), broNet: +(w.amount * 0.45).toFixed(2) }
+      // ── Option B: prefer the persisted split from DB, fallback to dynamic ──
+      split: w.persistedSplit
+        || splitMap[w.id]
+        || { meGross: w.amount / 2, broGross: w.amount / 2, meNet: +(w.amount * 0.45).toFixed(2), broNet: +(w.amount * 0.45).toFixed(2) }
     }));
 
     const totalWithdrawn = withdrawals.reduce((s, w) => s + w.amount, 0);
